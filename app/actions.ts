@@ -7,7 +7,7 @@ import { sql } from "@vercel/postgres";
 import { z } from "zod";
 
 // Initialize Gemini
-const model = google('gemini-2.0-pro-exp-02-05');
+const model = google('gemini-2.5-pro-exp-03-25');
 
 const systemPrompt = `You are a SQL (postgres) expert. Generate queries for an access control system using these guidelines:
 
