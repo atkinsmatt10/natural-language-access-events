@@ -1,7 +1,5 @@
 import { Info } from "lucide-react";
-import { DeployButton } from "./deploy-button";
 import { Alert, AlertDescription } from "./ui/alert";
-import Link from "next/link";
 
 export const ProjectInfo = () => {
   return (
@@ -9,30 +7,18 @@ export const ProjectInfo = () => {
       <Alert className="bg-muted text-muted-foreground border-0">
         <Info className="h-4 w-4 text-primary" />
         <AlertDescription>
-          This application uses the{" "}
-          <Link
-            target="_blank"
-            className="text-primary hover:text-primary/90 underline"
-            href="https://sdk.vercel.ai"
-          >
-            AI SDK
-          </Link>{" "}
-          to allow you to query a PostgreSQL database with natural language. The
-          dataset is CB Insights&apos; list of all unicorn companies. Learn more
-          at{" "}
-          <Link
-            href="https://www.cbinsights.com/research-unicorn-companies"
-            target="_blank"
-            className="text-primary hover:text-primary/90 underline"
-          >
-            CB Insights
-          </Link>
-          .
-          <div className="mt-4 sm:hidden">
-            <DeployButton />
-          </div>
+          This demo application allows you to analyze access control events using natural language queries. 
+          Ask questions about entry logs, access patterns, and security events across your properties.
         </AlertDescription>
       </Alert>
+      <div className="mt-4 flex flex-col items-center text-center text-muted-foreground">
+        <div className="text-sm font-medium">
+          Smarter living and working, for everyone.
+        </div>
+        <div className="text-xs mt-1">
+          SMRT 2025
+        </div>
+      </div>
     </div>
   );
 };

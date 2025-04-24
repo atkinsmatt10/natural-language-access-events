@@ -4,37 +4,33 @@ import csv from 'csv-parser';
 import path from 'path';
 import "dotenv/config"
 
-function parseDate(dateString: string): string {
-  const parts = dateString.split('/');
-  if (parts.length === 3) {
-    const day = parts[0].padStart(2, '0');
-    const month = parts[1].padStart(2, '0');
-    const year = parts[2];
-    return `${year}-${month}-${day}`;
-  }
-  console.warn(`Could not parse date: ${dateString}`);
-  throw Error();
-}
-
 export async function seed() {
+  // Create access_events table
   const createTable = await sql`
-    CREATE TABLE IF NOT EXISTS unicorns (
+    CREATE TABLE IF NOT EXISTS access_events (
       id SERIAL PRIMARY KEY,
-      company VARCHAR(255) NOT NULL UNIQUE,
-      valuation DECIMAL(10, 2) NOT NULL,
-      date_joined DATE,
-      country VARCHAR(255) NOT NULL,
-      city VARCHAR(255) NOT NULL,
-      industry VARCHAR(255) NOT NULL,
-      select_investors TEXT NOT NULL
+      door_name VARCHAR(255) NOT NULL,
+      controller_name VARCHAR(255) NOT NULL,
+      first_name VARCHAR(255) NOT NULL,
+      last_name VARCHAR(255) NOT NULL,
+      full_name VARCHAR(255) NOT NULL,
+      local_timestamp TIMESTAMP(6) NOT NULL,
+      code VARCHAR(255) NOT NULL,
+      credential_type VARCHAR(255) NOT NULL
     );
   `;
 
-  console.log(`Created "unicorns" table`);
+  console.log(`Created "access_events" table`);
 
   const results: any[] = [];
-  const csvFilePath = path.join(process.cwd(), 'unicorns.csv');
+  const csvFilePath = path.join(process.cwd(), 'access_events.csv');
 
+  // Verify file exists before attempting to read
+  if (!fs.existsSync(csvFilePath)) {
+    throw new Error(`CSV file not found at ${csvFilePath}`);
+  }
+
+  // Read and parse CSV file
   await new Promise((resolve, reject) => {
     fs.createReadStream(csvFilePath)
       .pipe(csv())
@@ -43,31 +39,41 @@ export async function seed() {
       .on('error', reject);
   });
 
+  // Insert data into PostgreSQL
   for (const row of results) {
-    const formattedDate = parseDate(row['Date Joined']);
-
-    await sql`
-      INSERT INTO unicorns (company, valuation, date_joined, country, city, industry, select_investors)
-      VALUES (
-        ${row.Company},
-        ${parseFloat(row['Valuation ($B)'].replace('$', '').replace(',', ''))},
-        ${formattedDate},
-        ${row.Country},
-        ${row.City},
-        ${row.Industry},
-        ${row['Select Investors']}
-      )
-      ON CONFLICT (company) DO NOTHING;
-    `;
+    try {
+      await sql`
+        INSERT INTO access_events (
+          door_name,
+          controller_name,
+          first_name,
+          last_name,
+          full_name,
+          local_timestamp,
+          code,
+          credential_type
+        ) VALUES (
+          ${row.door_name},
+          ${row.controller_name},
+          ${row.first_name},
+          ${row.last_name},
+          ${row.full_name},
+          TO_TIMESTAMP(${row.local_timestamp}, 'YYYY-MM-DD HH24:MI:SS.US'),
+          ${row.code},
+          ${row.credential_type}
+        )
+        ON CONFLICT (id) DO NOTHING;
+      `;
+    } catch (error) {
+      console.error('Error inserting row:', row, error);
+    }
   }
 
-  console.log(`Seeded ${results.length} unicorns`);
-
+  console.log(`Seeded ${results.length} access events`);
   return {
     createTable,
-    unicorns: results,
+    accessEvents: results,
   };
 }
-
 
 seed().catch(console.error);

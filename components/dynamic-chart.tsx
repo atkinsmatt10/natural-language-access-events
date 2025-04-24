@@ -106,59 +106,112 @@ export function DynamicChart({
             ))}
           </BarChart>
         );
-      case "line":
-        const { data, xAxisField, lineFields } = transformDataForMultiLineChart(
-          chartData,
-          chartConfig,
-        );
-        const useTransformedData =
-          chartConfig.multipleLines &&
-          chartConfig.measurementColumn &&
-          chartConfig.yKeys.includes(chartConfig.measurementColumn);
-        // console.log(useTransformedData, "useTransformedData");
-        // const useTransformedData = false;
-        return (
-          <LineChart data={useTransformedData ? data : chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey={useTransformedData ? chartConfig.xKey : chartConfig.xKey}
-            >
-              <Label
-                value={toTitleCase(
-                  useTransformedData ? xAxisField : chartConfig.xKey,
-                )}
-                offset={0}
-                position="insideBottom"
-              />
-            </XAxis>
-            <YAxis>
-              <Label
-                value={toTitleCase(chartConfig.yKeys[0])}
-                angle={-90}
-                position="insideLeft"
-              />
-            </YAxis>
-            <ChartTooltip content={<ChartTooltipContent />} />
-            {chartConfig.legend && <Legend />}
-            {useTransformedData
-              ? lineFields.map((key, index) => (
-                  <Line
-                    key={key}
-                    type="monotone"
-                    dataKey={key}
-                    stroke={colors[index % colors.length]}
+        case "line":
+  const { data, xAxisField, lineFields } = transformDataForMultiLineChart(
+    chartData,
+    chartConfig,
+  );
+  const useTransformedData =
+    chartConfig.multipleLines &&
+    chartConfig.measurementColumn &&
+    chartConfig.yKeys.includes(chartConfig.measurementColumn);
+
+  // Parse the dates properly with null checking
+  const parsedData = (useTransformedData ? data : chartData).map(item => ({
+    ...item,
+    month: item.month ? new Date(item.month).getTime() : null // Handle null values
+  }));
+
+  const formatDate = (value: string | number | null) => {
+    if (value === null) return 'No Date';
+    
+    try {
+      // Handle both timestamp and date string formats
+      const date = typeof value === 'number' ? new Date(value) : new Date(value);
+      return date.toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric'
+      });
+    } catch (e) {
+      console.error('Date parsing error:', e);
+      return 'Invalid Date';
+    }
+  };
+
+  return (
+    <LineChart data={parsedData}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis
+        dataKey="month"
+        type="number"
+        domain={['dataMin', 'dataMax']}
+        tickFormatter={(value) => formatDate(value)}
+        scale="time"
+      >
+        <Label
+          value={toTitleCase(
+            useTransformedData ? xAxisField : chartConfig.xKey,
+          )}
+          offset={0}
+          position="insideBottom"
+        />
+      </XAxis>
+      <YAxis>
+        <Label
+          value={toTitleCase(chartConfig.yKeys[0])}
+          angle={-90}
+          position="insideLeft"
+        />
+      </YAxis>
+      <ChartTooltip
+        content={({ active, payload, label }) => {
+          if (!active || !payload?.length) return null;
+          
+          return (
+            <div className="rounded-lg border bg-background p-2 shadow-sm">
+              <div className="font-medium">{formatDate(label)}</div>
+              {payload.map((entry: any, index: number) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: entry.color }}
                   />
-                ))
-              : chartConfig.yKeys.map((key, index) => (
-                  <Line
-                    key={key}
-                    type="monotone"
-                    dataKey={key}
-                    stroke={colors[index % colors.length]}
-                  />
-                ))}
-          </LineChart>
-        );
+                  <span className="text-muted-foreground">
+                    {toTitleCase(entry.name)}:
+                  </span>
+                  <span className="font-medium">
+                    {entry.value?.toLocaleString() ?? 'N/A'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        }}
+      />
+      {chartConfig.legend && <Legend />}
+      {useTransformedData
+        ? lineFields.map((key, index) => (
+            <Line
+              key={key}
+              type="monotone"
+              dataKey={key}
+              stroke={colors[index % colors.length]}
+              name={toTitleCase(key)}
+              connectNulls // Add this to handle null values
+            />
+          ))
+        : chartConfig.yKeys.map((key, index) => (
+            <Line
+              key={key}
+              type="monotone"
+              dataKey={key}
+              stroke={colors[index % colors.length]}
+              name={toTitleCase(key)}
+              connectNulls // Add this to handle null values
+            />
+          ))}
+    </LineChart>
+  );
       case "area":
         return (
           <AreaChart data={chartData}>

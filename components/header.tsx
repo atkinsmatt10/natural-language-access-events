@@ -1,34 +1,46 @@
+// header.tsx
 import { Moon, Sun } from "lucide-react";
-import { DeployButton } from "./deploy-button";
 import { Button } from "./ui/button";
 import { useTheme } from "next-themes";
+import Image from "next/image";
 
 export const Header = ({ handleClear }: { handleClear: () => void }) => {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className="flex items-center justify-between mb-6">
-      <h1
-        className="text-2xl sm:text-3xl font-bold text-foreground flex items-center cursor-pointer"
-        onClick={() => handleClear()}
-      >
-        Natural Language PostgreSQL
-      </h1>
-      <div className="flex items-center justify-center space-x-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+    <div className="flex flex-col items-center space-y-6">
+      {/* Logo centered above */}
+      <div className="w-full flex justify-center">
+        <Image
+          src="/smartrent-logo.png" // Make sure to add your logo to the public folder
+          alt="SmartRent Logo"
+          width={200} // Adjust size as needed
+          height={68} // Adjust size as needed
+          className="dark:invert" // Inverts logo color in dark mode if needed
+        />
+      </div>
+
+      {/* Existing header row */}
+      <div className="w-full flex items-center justify-between">
+        <h1
+          className="text-2xl sm:text-3xl font-bold text-foreground flex items-center cursor-pointer"
+          onClick={() => handleClear()}
         >
-          {theme === "dark" ? (
-            <Moon className="h-5 w-5" />
-          ) : (
-            <Sun className="h-5 w-5" />
-          )}
-          <span className="sr-only">Toggle theme</span>
-        </Button>
-        <div className="hidden sm:block">
-          <DeployButton />
+          AI Powered Event Search
+        </h1>
+        <div className="flex items-center justify-center space-x-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+          >
+            {theme === "dark" ? (
+              <Moon className="h-5 w-5" />
+            ) : (
+              <Sun className="h-5 w-5" />
+            )}
+            <span className="sr-only">Toggle theme</span>
+          </Button>
         </div>
       </div>
     </div>

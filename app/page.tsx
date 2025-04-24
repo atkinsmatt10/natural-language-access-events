@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   generateChartConfig,
   generateQuery,
   runGenerateSQLQuery,
+  generateTableSummary,
 } from "./actions";
 import { Config, Result } from "@/lib/types";
 import { Loader2 } from "lucide-react";
@@ -16,6 +17,8 @@ import { SuggestedQueries } from "@/components/suggested-queries";
 import { QueryViewer } from "@/components/query-viewer";
 import { Search } from "@/components/search";
 import { Header } from "@/components/header";
+import { generateText } from "ai";
+
 
 export default function Page() {
   const [inputValue, setInputValue] = useState("");
@@ -59,6 +62,7 @@ export default function Page() {
     }
   };
 
+
   const handleSuggestionClick = async (suggestion: string) => {
     setInputValue(suggestion);
     try {
@@ -80,6 +84,18 @@ export default function Page() {
     setInputValue("");
     clearExistingData();
   };
+  useEffect(() => {
+    if (results.length > 0) {
+      console.log('Client received results:', results);
+      // Log a sample timestamp
+      const sampleTimestamp = results[0].local_timestamp;
+      console.log('Sample timestamp:', {
+        raw: sampleTimestamp,
+        type: typeof sampleTimestamp,
+        parsed: new Date(sampleTimestamp)
+      });
+    }
+  }, [results]);
 
   return (
     <div className="bg-neutral-50 dark:bg-neutral-900 flex items-start justify-center p-0 sm:p-8">
@@ -125,27 +141,32 @@ export default function Page() {
                         />
                       )}
                       {loading ? (
-                        <div className="h-full absolute bg-background/50 w-full flex flex-col items-center justify-center space-y-4">
-                          <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
-                          <p className="text-foreground">
-                            {loadingStep === 1
-                              ? "Generating SQL query..."
-                              : "Running SQL query..."}
-                          </p>
-                        </div>
-                      ) : results.length === 0 ? (
-                        <div className="flex-grow flex items-center justify-center">
-                          <p className="text-center text-muted-foreground">
-                            No results found.
-                          </p>
-                        </div>
-                      ) : (
-                        <Results
-                          results={results}
-                          chartConfig={chartConfig}
-                          columns={columns}
-                        />
-                      )}
+  <div className="flex-grow flex items-center justify-center bg-background/50 relative w-full min-h-[400px]">
+    <div className="flex flex-col items-center justify-center space-y-4">
+      <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+      <p className="text-foreground">
+        {loadingStep === 1
+          ? "Generating SQL query..."
+          : "Running SQL query..."}
+      </p>
+    </div>
+  </div>
+) : results.length === 0 ? (
+  <div className="flex-grow flex items-center justify-center">
+    <p className="text-center text-muted-foreground">
+      No results found.
+    </p>
+  </div>
+) : (
+  <Results
+    results={results}
+    columns={columns}
+    chartConfig={chartConfig}
+    generateSummary={generateTableSummary}
+    userQuery={inputValue}
+    sqlQuery={activeQuery}
+  />
+)}
                     </motion.div>
                   )}
                 </AnimatePresence>
