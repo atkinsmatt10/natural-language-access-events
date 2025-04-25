@@ -3,9 +3,15 @@ import { Moon, Sun } from "lucide-react";
 import { Button } from "./ui/button";
 import { useTheme } from "next-themes";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 export const Header = ({ handleClear }: { handleClear: () => void }) => {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div className="flex flex-col items-center space-y-6">
@@ -29,18 +35,20 @@ export const Header = ({ handleClear }: { handleClear: () => void }) => {
           AI Powered Event Search
         </h1>
         <div className="flex items-center justify-center space-x-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-          >
-            {theme === "dark" ? (
-              <Moon className="h-5 w-5" />
-            ) : (
-              <Sun className="h-5 w-5" />
-            )}
-            <span className="sr-only">Toggle theme</span>
-          </Button>
+          {mounted && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+            >
+              {theme === "dark" ? (
+                <Moon className="h-5 w-5" />
+              ) : (
+                <Sun className="h-5 w-5" />
+              )}
+              <span className="sr-only">Toggle theme</span>
+            </Button>
+          )}
         </div>
       </div>
     </div>
