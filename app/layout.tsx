@@ -1,4 +1,5 @@
 import "./globals.css";
+import { requireAccess } from "@/lib/auth";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "next-themes";
@@ -10,11 +11,12 @@ export const metadata = {
     "Chat with a Postgres database using natural language powered by the AI SDK by Vercel.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  await requireAccess();
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${GeistMono.className} ${GeistSans.className}`}>

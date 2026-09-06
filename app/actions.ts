@@ -4,7 +4,10 @@ import { Config, configSchema, explanationsSchema, Result } from "@/lib/types";
 import { generateText, generateObject } from 'ai';
 import { google } from '@ai-sdk/google';
 import { sql } from "@vercel/postgres";
-import { z } from "zod";
+import "server-only";
+import { requireAccess } from "@/lib/auth";
+import { executeAccessQuery, validateAccessQuery } from "@/lib/query-security";
+import { questionSchema, sqlInputSchema, resultsSchema } from "@/lib/action-validation";
 
 // Initialize Gemini
 const model = google('gemini-2.5-pro-exp-03-25');
@@ -108,174 +111,34 @@ Remember:
 - Include all relevant columns for context`;
 
 export const generateQuery = async (input: string) => {
-  "use server";
+  await requireAccess();
+  input = questionSchema.parse(input);
   try {
-    console.log('Generating query for input:', input);
-
     const result = await generateText({
       model,
-      prompt: `${systemPrompt}\n\nGenerate a SQL query for this request: ${input}\n\nReturn ONLY the SQL query, no explanations or comments.`,
+      system: systemPrompt,
+      prompt: `Generate a SQL query for this request: ${input}. Return ONLY SQL.`,
       temperature: 0.2,
+      maxOutputTokens: 2_000,
+      abortSignal: AbortSignal.timeout(30_000),
+      maxRetries: 1,
     });
-    
-    console.log('Raw response from model:', result.text);
-    
-    let response = result.text.trim();
-    console.log('Trimmed response:', response);
-    
-    // Remove markdown code blocks if present
-    if (response.includes('```')) {
-      console.log('Markdown code blocks detected, cleaning up...');
-      response = response.replace(/```sql\n?/g, '').replace(/```\n?/g, '').trim();
-      console.log('Response after markdown cleanup:', response);
-    }
-
-    // Remove comments
-    response = response.replace(/--.*$/gm, '').trim();
-    console.log('Response after comment cleanup:', response);
-    
-    // Clean up whitespace
-    response = response
-      .replace(/\n\s+/g, '\n') // Remove extra spaces at start of lines
-      .replace(/\s+/g, ' ')    // Replace multiple spaces with single space
-      .trim();
-    console.log('Response after whitespace cleanup:', response);
-    
-    type Replacement = [RegExp, string];
-
-const replacements: Replacement[] = [
-  // Name matching replacement (must come first)
-  [/full_name\s*=\s*'([^']+)'/g, "LOWER(full_name) ILIKE LOWER('%$1%')"],
-  [/full_name\s*=\s*"([^"]+)"/g, "LOWER(full_name) ILIKE LOWER('%$1%')"],
-  
-  // Other replacements
-  [/\bevent_time\b/g, 'local_timestamp'],
-  [/\btimestamp\b/g, 'local_timestamp'],
-  [/\bcreation_timestamp\b/g, 'local_timestamp'],
-  [/\buser_credentials\b/g, 'access_events'],
-  [/\bcredentials\b/g, 'access_events'],
-  [/\bis_mobile\s*=\s*TRUE\b/gi, "credential_type = 'mobile'"],
-];
-
-    for (const [pattern, replacement] of replacements) {
-      const oldResponse = response;
-      response = response.replace(pattern, replacement);
-      if (oldResponse !== response) {
-        console.log(`Replacement made: ${pattern}`);
-        console.log('Before:', oldResponse);
-        console.log('After:', response);
-      }
-    }
-    
-    console.log('Response after all fixes:', response);
-    
-    // Validate that it's a SELECT query
-    if (!response.toUpperCase().startsWith('SELECT')) {
-      console.error('Invalid response:', response);
-      console.error('Response length:', response.length);
-      console.error('First character code:', response.charCodeAt(0));
-      console.error('First few characters codes:', 
-        Array.from(response.substring(0, 10)).map(c => c.charCodeAt(0))
-      );
-      throw new Error("Query must start with SELECT");
-    }
-
-    // Format the query nicely
-    const formattedQuery = `SELECT ${response.substring(6).trim()}`;
-    console.log('Final formatted query:', formattedQuery);
-    
-    return formattedQuery;
-
-  } catch (e: unknown) {
-    if (e instanceof Error) {
-      console.error('Error in generateQuery:', e);
-      console.error('Error stack:', e.stack);
-    } else {
-      console.error('Unknown error:', e);
-    }
+    const response = result.text.trim().replace(/^```(?:sql)?\s*/i, "").replace(/\s*```$/, "");
+    return validateAccessQuery(response);
+  } catch {
     throw new Error("Failed to generate query");
   }
 };
 
 export const runGenerateSQLQuery = async (query: string) => {
-  "use server";
-  
-  // Add logging to see the incoming query
-  console.log("Incoming query:", query);
-
-  // Guard against null or undefined
-  if (!query) {
-    throw new Error("Query cannot be empty");
-  }
-
-  const trimmedQuery = query.trim();
-  const lowerQuery = trimmedQuery.toLowerCase();
-
-  // More precise SELECT validation
-  const isValidSelect = lowerQuery.startsWith('select ') || lowerQuery.startsWith('select\n');
-  
-  // List of forbidden keywords
-  const forbiddenKeywords = [
-    'drop',
-    'delete',
-    'insert',
-    'update',
-    'alter',
-    'truncate',
-    'create',
-    'grant',
-    'revoke'
-  ];
-
-  // Check for forbidden keywords more precisely
-  const containsForbiddenKeyword = forbiddenKeywords.some(keyword => 
-    new RegExp(`\\b${keyword}\\b`).test(lowerQuery)
-  );
-
-  if (!isValidSelect || containsForbiddenKeyword) {
-    console.error("Query validation failed:", {
-      isValidSelect,
-      containsForbiddenKeyword,
-      query: trimmedQuery
-    });
-    throw new Error("Only SELECT queries are allowed");
-  }
-
-  let data: any;
-  try {
-    console.log("Executing query:", trimmedQuery);
-    data = await sql.query(trimmedQuery);
-    console.log("Query executed successfully");
-  } catch (e: any) {
-    console.error("Query execution error:", e);
-    if (e.message.includes('relation "access_events" does not exist')) {
-      console.log(
-        "Table does not exist, creating and seeding it with dummy data now...",
-      );
-      throw Error("Table does not exist");
-    } else {
-      throw e;
-    }
-  }
-
-  console.log("Server executing query:", query);
-
-  try {
-    const data = await sql.query(query);
-    console.log("Server sample result:", {
-      firstRow: data.rows[0],
-      timestamp: data.rows[0]?.local_timestamp,
-      totalRows: data.rows.length
-    });
-    return data.rows as Result[];
-  } catch (e) {
-    console.error("Server query error:", e);
-    throw e;
-  }
+  await requireAccess();
+  return await executeAccessQuery(query, () => sql.connect()) as Result[];
 };
 
 export const explainQuery = async (input: string, sqlQuery: string) => {
-  "use server";
+  await requireAccess();
+  input = questionSchema.parse(input);
+  sqlQuery = sqlInputSchema.parse(sqlQuery);
   try {
     const systemPrompt = `You are a SQL (postgres) expert. Your job is to explain to the user write a SQL query you wrote to retrieve the data they asked for. The table schema is as follows:
     access_events (
@@ -298,13 +161,16 @@ export const explainQuery = async (input: string, sqlQuery: string) => {
 
     const result = await generateObject({
       model,
+      maxOutputTokens: 2_000,
+      abortSignal: AbortSignal.timeout(30_000),
+      maxRetries: 1,
       schema: explanationsSchema,
       prompt: `${systemPrompt}\n\nUser Query:\n${input}\n\nGenerated SQL Query:\n${sqlQuery}`
     });
 
     return { explanations: result.object };
   } catch (e) {
-    console.error(e);
+    console.error("AI request failed");
     throw new Error("Failed to generate query explanation");
   }
 };
@@ -313,8 +179,11 @@ export const generateChartConfig = async (
   results: Result[],
   userQuery: string,
 ) => {
-  "use server";
+  await requireAccess();
   
+  userQuery = questionSchema.parse(userQuery);
+  resultsSchema.parse(results);
+
   // Early return if no results
   if (!results || !results.length) {
     console.warn('No results provided to chart configuration');
@@ -401,6 +270,9 @@ export const generateChartConfig = async (
 
     const result = await generateObject({
       model,
+      maxOutputTokens: 2_000,
+      abortSignal: AbortSignal.timeout(30_000),
+      maxRetries: 1,
       schema: configSchema,
       prompt: `
         ${systemPrompt}
@@ -434,7 +306,7 @@ export const generateChartConfig = async (
     };
 
   } catch (e: unknown) {
-    console.error(e);
+    console.error("AI request failed");
     
     const fallbackConfig: Config = {
       type: "bar",
@@ -465,9 +337,16 @@ export const generateTableSummary = async (
   userQuery: string,
   sqlQuery: string
 ): Promise<string> => {
+  await requireAccess();
+  userQuery = questionSchema.parse(userQuery);
+  sqlQuery = sqlInputSchema.parse(sqlQuery);
+  resultsSchema.parse(results);
   try {
     const result = await generateText({
       model,
+      maxOutputTokens: 1_000,
+      abortSignal: AbortSignal.timeout(30_000),
+      maxRetries: 1,
       prompt: `As a security access control analyst, provide a concise, informative summary of the access event data based on the user's search intent and the data retrieved.
 
 CONTEXT:
@@ -507,7 +386,7 @@ Provide a clear, security-focused summary that addresses the user's search inten
     
     return result.text.trim() || "No summary available.";
   } catch (e) {
-    console.error('Error generating summary:', e);
+    console.error("Summary generation failed");
     return "Error generating summary.";
   }
 };
