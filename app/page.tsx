@@ -17,7 +17,6 @@ import { SuggestedQueries } from "@/components/suggested-queries";
 import { QueryViewer } from "@/components/query-viewer";
 import { Search } from "@/components/search";
 import { Header } from "@/components/header";
-import { generateText } from "ai";
 
 
 export default function Page() {
