@@ -35,7 +35,7 @@
     "date-fns": "^4.4.0",
     "eslint": "9.39.5",
     "eslint-config-next": "15.5.25",
-    "framer-motion": "^11.18.2",
+    "framer-motion": "^13.2.0",
     "geist": "^1.7.2",
     "lucide-react": "^0.468.0",
     "ms": "^2.1.3",
